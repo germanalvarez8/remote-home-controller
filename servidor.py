@@ -4,9 +4,9 @@ import tinytuya
 app = Flask(__name__)
 
 # Reemplaza con tus credenciales reales
-DISPOSITIVO_ID = "eb5015450734ad8b52a113"
-LOCAL_KEY = "&DG&vL*M;MSg(ynH"
-IP_LOCAL_DISPOSITIVO = "186.122.108.90" # Opcional, pero recomendado para estabilidad
+DISPOSITIVO_ID = "ebcc6218d3f6e644e376ty"
+LOCAL_KEY = "g+>0fCwQ{^#n[]Jy"
+IP_LOCAL_DISPOSITIVO = "186.122.108.66" # Opcional, pero recomendado para estabilidad
 
 d = tinytuya.OutletDevice(DISPOSITIVO_ID, IP_LOCAL_DISPOSITIVO, LOCAL_KEY)
 d.set_version(3.3) # Esto es importante para la mayoria de los dispositivos Tuya modernos
