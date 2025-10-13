@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import tinytuya
 
 app = Flask(__name__)
@@ -6,10 +6,14 @@ app = Flask(__name__)
 # Reemplaza con tus credenciales reales
 DISPOSITIVO_ID = "ebcc6218d3f6e644e376ty"
 LOCAL_KEY = "g+>0fCwQ{^#n[]Jy"
-IP_LOCAL_DISPOSITIVO = "186.122.108.66" # Opcional, pero recomendado para estabilidad
+IP_LOCAL_DISPOSITIVO = "192.168.100.52" # Opcional, pero recomendado para estabilidad
 
 d = tinytuya.OutletDevice(DISPOSITIVO_ID, IP_LOCAL_DISPOSITIVO, LOCAL_KEY)
 d.set_version(3.3) # Esto es importante para la mayoria de los dispositivos Tuya modernos
+
+@app.route('/controlar', methods=['GET'])
+def index():
+    return render_template('cliente.html')
 
 @app.route('/controlar', methods=['POST'])
 def controlar():
@@ -20,6 +24,9 @@ def controlar():
         print(f"Datos recibidos: {data}")
 
         comando = data.get("comando")
+
+        status=d.status() # Obtiene el estado actual del enchufe
+        print(f"Estado actual del enchufe: {status}")
 
         if comando == "encender":
             d.turn_on() # Enciende el enchufe
