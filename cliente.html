@@ -9,14 +9,15 @@
     </style>
 </head>
 <body>
-    <h1>Control Remoto</h1>
-    <button onclick="enviarDatos()">Enviar Señal</button>
+    <h1>Control del Velador</h1>
+    <button onclick="enviarComando('encender')">Encender</button>
+    <button onclick="enviarComando('apagar')">Apagar</button>
     <p id="estado"></p>
 
     <script>
-        async function enviarDatos() {
-            const url = 'http://TU_IP_PUBLICA:5000/controlar';
-            const estado = { "comando": "encender" };
+        async function enviarComando(comando) {
+            const url = 'http://192.168.100.55:5000/controlar';
+            const estado = { "comando": comando };
 
             try {
                 const respuesta = await fetch(url, {

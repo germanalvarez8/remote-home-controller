@@ -1,6 +1,15 @@
 from flask import Flask, request, jsonify
+import tinytuya
 
 app = Flask(__name__)
+
+# Reemplaza con tus credenciales reales
+DISPOSITIVO_ID = "tu_device_id_aqui"
+LOCAL_KEY = "tu_local_key_aqui"
+IP_LOCAL_DISPOSITIVO = "la_ip_privada_del_enchufe" # Opcional, pero recomendado para estabilidad
+
+d = tinytuya.OutletDevice(DISPOSITIVO_ID, IP_LOCAL_DISPOSITIVO, LOCAL_KEY)
+d.set_version(3.3) # Esto es importante para la mayoria de los dispositivos Tuya modernos
 
 @app.route('/controlar', methods=['POST'])
 def controlar():
@@ -9,7 +18,20 @@ def controlar():
     try:
         data = request.json
         print(f"Datos recibidos: {data}")
-        return jsonify({"mensaje": "Datos recibidos correctamente"}), 200
+
+        comando = data.get("comando")
+
+        if comando == "encender":
+            d.turn_on() # Enciende el enchufe
+            print("Comando: ENCENDER")
+            return jsonify({"mensaje": "Enchufe encendido"}), 200
+        elif comando == "apagar":
+            d.turn_off() # Apaga el enchufe
+            print("Comando: APAGAR")
+            return jsonify({"mensaje": "Enchufe apagado"}), 200
+        else:
+            return jsonify({"error": "Comando no valido"}), 400
+
     except Exception as e:
         print(f"Error: {e}")
         return jsonify({"error": "Formato de datos incorrecto"}), 400
