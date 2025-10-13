@@ -9,7 +9,7 @@ LOCAL_KEY = "g+>0fCwQ{^#n[]Jy"
 IP_LOCAL_DISPOSITIVO = "192.168.100.52" # Opcional, pero recomendado para estabilidad
 
 d = tinytuya.OutletDevice(DISPOSITIVO_ID, IP_LOCAL_DISPOSITIVO, LOCAL_KEY)
-d.set_version(3.3) # Esto es importante para la mayoria de los dispositivos Tuya modernos
+d.set_version(3.4) # Esto es importante para la mayoria de los dispositivos Tuya modernos
 
 @app.route('/controlar', methods=['GET'])
 def index():
