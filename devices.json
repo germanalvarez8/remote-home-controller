@@ -1,0 +1,18 @@
+{
+    "enchufe_oficina": {
+        "id": "tuya_id_enchufe1",
+        "ip": "192.168.10.20",
+        "key": "clave_local_enchufe1"
+    },
+    "enchufe_proyector": {
+        "id": "tuya_id_enchufe2",
+        "ip": "192.168.10.21",
+        "key": "clave_local_enchufe2"
+    },
+    "lampara_rgb": {
+        "id": "tuya_id_lampara",
+        "ip": "192.168.10.22",
+        "key": "clave_local_lampara",
+        "version": 3.3
+    }
+}
