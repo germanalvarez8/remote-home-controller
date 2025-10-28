@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Kahoot Admin - Control</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; border: none; border-radius: 5px; color: white; }
+        #start-btn { background-color: #4CAF50; }
+        #next-btn { background-color: #2196F3; }
+        #end-btn { background-color: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Kahoot Admin (IP: {{ ip_admin }})</h1>
+        <p>Control de juego centralizado. Usa los botones para gestionar las rondas.</p>
+        
+        <div id="controls">
+            <button id="start-btn">INICIAR JUEGO</button>
+            <button id="next-btn" disabled>SIGUIENTE PREGUNTA</button>
+            <button id="end-btn" disabled>FINALIZAR JUEGO</button>
+        </div>
+
+        <hr>
+        <h2>Estado Actual</h2>
+        <p id="status-display">Esperando comando de inicio...</p>
+
+        <h2>Puntuaciones</h2>
+        <ul id="score-list">
+            </ul>
+    </div>
+
+    <script>
+        // La IP de conexión puede ser la IP pública o la IP local estática
+        const socket = io(); 
+        let juego_activo = false;
+
+        socket.on('connect', () => {
+            console.log('Conectado al servidor como Administrador.');
+            document.getElementById('status-display').textContent = 'Conectado. Presiona INICIAR JUEGO.';
+            socket.emit('comando_admin', {comando: 'estado'}); // Pedir estado inicial
+        });
+
+        // Manejar el estado enviado por el servidor
+        socket.on('admin_estado', (estado) => {
+            juego_activo = estado.activo;
+            
+            // Actualizar botones y estado
+            document.getElementById('start-btn').disabled = juego_activo;
+            document.getElementById('next-btn').disabled = !juego_activo;
+            document.getElementById('end-btn').disabled = !juego_activo;
+            
+            if (juego_activo) {
+                document.getElementById('status-display').textContent = `Juego ACTIVO. Ronda: ${estado.ronda_actual + 1}`;
+            } else {
+                document.getElementById('status-display').textContent = 'Juego INACTIVO. Listo para iniciar.';
+            }
+
+            // Actualizar lista de puntuaciones
+            const scoreList = document.getElementById('score-list');
+            scoreList.innerHTML = '';
+            
+            // Convertir el objeto de puntuaciones a un array para ordenarlo
+            const scoresArray = Object.values(estado.puntuaciones).sort((a, b) => b.puntuacion - a.puntuacion);
+            
+            scoresArray.forEach(info => {
+                const li = document.createElement('li');
+                li.textContent = `${info.nombre}: ${info.puntuacion} puntos`;
+                scoreList.appendChild(li);
+            });
+        });
+
+        // Configuración de botones
+        document.getElementById('start-btn').addEventListener('click', () => {
+            socket.emit('comando_admin', {comando: 'iniciar'});
+        });
+        document.getElementById('next-btn').addEventListener('click', () => {
+            socket.emit('comando_admin', {comando: 'siguiente'});
+        });
+        document.getElementById('end-btn').addEventListener('click', () => {
+            socket.emit('comando_admin', {comando: 'finalizar'});
+        });
+    </script>
+</body>
+</html>
