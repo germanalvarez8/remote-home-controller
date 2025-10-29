@@ -37,6 +37,23 @@
         const socket = io(); 
         let nombreJugador = '';
 
+        document.addEventListener('DOMContentLoaded', () => {
+            const nombreGuardado = localStorage.getItem('kahoot_nombre');
+            if (nombreGuardado) {
+                document.getElementById('player-name').textContent = nombreGuardado;
+                // Inicia la conexión con el nombre guardado.
+                socket.emit('conectar_jugador', {nombre: nombreGuardado});
+                
+                // Oculta el formulario si ya tienes el nombre
+                document.getElementById('join-form').style.display = 'none'; 
+                document.getElementById('game-area').style.display = 'block';
+                
+            } else {
+                // Si no hay nombre, redirige a la página de login
+                window.location.href = '/'; 
+            }
+        });
+
         function unirseAlJuego() {
             nombreJugador = document.getElementById('nombre-input').value.trim();
             if (nombreJugador) {

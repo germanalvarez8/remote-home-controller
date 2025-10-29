@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Kahoot - Únete</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; text-align: center; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+        .form-box { padding: 20px; }
+        button { background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Kahoot de Redes</h1>
+        
+        <div class="form-box">
+            <h2>Ingresa tu Nombre</h2>
+            <input type="text" id="nombre-input" placeholder="Nombre (o 'Admin')" required style="padding: 10px; width: 80%; margin-bottom: 15px;">
+            <button onclick="unirseAlJuego()">Unirse al Juego</button>
+            <p id="mensaje-error" style="color: red; margin-top: 15px;"></p>
+        </div>
+    </div>
+
+    <script>
+        const socket = io(); 
+
+        socket.on('connect', () => {
+            console.log('Conectado al servidor.');
+        });
+        
+        // Maneja la orden de redirigir (solo si el nombre es 'Admin')
+        socket.on('redirigir', (url) => {
+            window.location.href = url;
+        });
+
+        // Maneja el error si ya hay un Admin activo
+        socket.on('mensaje_error_login', (msg) => {
+            document.getElementById('mensaje-error').textContent = msg;
+        });
+
+        function unirseAlJuego() {
+            const nombre = document.getElementById('nombre-input').value.trim();
+            if (nombre) {
+                // Envía el nombre al servidor para validación
+                socket.emit('conectar_jugador', {nombre: nombre});
+                
+                // Si el nombre no es "Admin", lo enviamos a la vista regular de jugador
+                if (nombre.toUpperCase() !== "ADMIN") {
+                    // Guarda el nombre en el almacenamiento local para usarlo en jugador.html
+                    localStorage.setItem('kahoot_nombre', nombre);
+                    window.location.href = '/jugador'; // Redirige a la vista de jugador
+                }
+            }
+        }
+    </script>
+</body>
+</html>

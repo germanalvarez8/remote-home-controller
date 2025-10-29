@@ -1,5 +1,5 @@
 # app_kahoot_web.py
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for
 from flask_socketio import SocketIO, emit, join_room
 
 app = Flask(__name__)
@@ -12,6 +12,7 @@ socketio = SocketIO(app)
 ADMIN_IP = '192.168.100.101'
 SERVER_HOST = '192.168.10.100' # IP Estática del Servidor
 SERVER_PORT = 8080
+ADMIN_SESSION_ID = None
 
 # --- BASE DE DATOS DEL JUEGO ---
 PREGUNTAS = [
@@ -32,27 +33,53 @@ ESTADO_JUEGO = {
 
 @app.route('/')
 def index():
-    """Ruta principal que diferencia entre Administrador y Jugador."""
-    cliente_ip = request.remote_addr
+    return render_template('login_o_jugador.html')
 
-    # Lógica de Diferenciación: Solo la IP estática de la MacBook obtiene la vista de Admin.
-    if cliente_ip == ADMIN_IP:
-        return render_template('admin.html', ip_admin=ADMIN_IP)
+@app.route('/admin_view')
+def admin_view():
+    """Ruta dedicada para la vista del administrador."""
+    # En un sistema real, aquí se verificaría la sesión.
+    # Para simplificar, si llegaste aquí, se asume que tu nombre fue 'Admin'.
+    return render_template('admin.html', ip_admin=request.remote_addr)
 
-    # Cualquier otra IP (jugadores) recibe la vista de juego.
-    return render_template('jugador.html') 
-
+@app.route('/jugador')
+def jugador_view():
+    """Ruta dedicada para la vista del jugador."""
+    return render_template('jugador.html')
 
 # --- GESTIÓN DE SOCKETS (Comunicación en Tiempo Real) ---
-
 @socketio.on('conectar_jugador')
 def handle_join(data):
-    """Maneja la unión de un nuevo jugador o la reconexión."""
+    """Maneja la unión de un nuevo jugador, incluyendo la validación de 'Admin'."""
+    global ADMIN_SESSION_ID
     session_id = request.sid
-    nombre = data.get('nombre', 'Jugador Anónimo')
+    nombre_ingresado = data.get('nombre', 'Jugador Anónimo').strip()
+    
+    # --- LÓGICA DE CONTROL DE ACCESO ADMIN ---
+    if nombre_ingresado.upper() == "ADMIN":
+        if ADMIN_SESSION_ID is None:
+            # 1. Permite el acceso: La sesión es declarada como Administrador.
+            ADMIN_SESSION_ID = session_id
+            print(f"[ADMIN] Admin conectado desde {request.remote_addr}")
+            
+            # Notificamos al cliente que debe redirigir su navegador a la vista de admin.
+            emit('redirigir', url_for('admin_view'), room=session_id)
+            return
+        else:
+            # 2. Rechaza el acceso: Ya hay un administrador activo.
+            emit('mensaje_error_login', 'ERROR: Ya hay un Administrador activo. Solo se permite uno.')
+            return
 
-    # CORRECCIÓN para asegurar que el jugador siempre sea inicializado antes de responder (Problema 3)
-    # Utilizamos el nombre del jugador para evitar reinicializar si ya está conectado
+    # --- Lógica de Jugador Estándar (Si no es 'Admin' o si el 'Admin' ya está ocupado) ---
+    
+    # 3. Inicializa el jugador (asegurando un nombre único si es necesario, aunque aquí lo simplificamos)
+    nombre = nombre_ingresado
+    
+    if session_id not in ESTADO_JUEGO["puntuaciones"]:
+        ESTADO_JUEGO["puntuaciones"][session_id] = {"nombre": nombre, "puntuacion": 0, "respondido": False}
+        
+    join_room('jugadores') 
+    print(f"[CONEXION] Jugador {nombre} ({request.remote_addr}) unido.")
     if session_id not in ESTADO_JUEGO["puntuaciones"]:
         # Inicializa la puntuación para la nueva sesión
         ESTADO_JUEGO["puntuaciones"][session_id] = {"nombre": nombre, "puntuacion": 0, "respondido": False}
@@ -117,10 +144,15 @@ def handle_respuesta(data):
 
 @socketio.on('comando_admin')
 def handle_comando_admin(data):
+    global ADMIN_SESSION_ID
     """Procesa comandos solo si provienen de la IP del Administrador."""
     # Control de Acceso por IP: La IP de origen DEBE ser la del Admin.
     if request.remote_addr != ADMIN_IP:
         print(f"[SEGURIDAD] Intento de comando Admin desde IP no autorizada: {request.remote_addr}")
+        return
+
+    if request.sid != ADMIN_SESSION_ID:
+        print(f"[SEGURIDAD] Comando no autorizado desde SID: {request.sid}")
         return
 
     comando = data.get('comando')
@@ -162,6 +194,22 @@ def handle_comando_admin(data):
     # El admin siempre recibe el estado actual para la interfaz
     socketio.emit('admin_estado', ESTADO_JUEGO, room=request.sid)
 
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Libera el slot de administrador si el administrador actual se desconecta."""
+    global ADMIN_SESSION_ID
+    session_id = request.sid
+
+    if session_id == ADMIN_SESSION_ID:
+        ADMIN_SESSION_ID = None
+        print("[ADMIN] Administrador se ha desconectado. Slot liberado.")
+        # Opcional: Notificar a todos que el juego fue interrumpido.
+        socketio.emit('mensaje_broadcast', 'El Administrador se ha desconectado.', room='jugadores')
+
+    # Remoción de jugadores (lógica opcional si manejas la limpieza de puntuaciones)
+    if session_id in ESTADO_JUEGO["puntuaciones"]:
+        del ESTADO_JUEGO["puntuaciones"][session_id]
+        socketio.emit('admin_estado', ESTADO_JUEGO)
 
 if __name__ == '__main__':
     print(f"[*] Servidor corriendo en http://{SERVER_HOST}:{SERVER_PORT}")
