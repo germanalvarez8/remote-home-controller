@@ -8,7 +8,7 @@ app.config['SECRET_KEY'] = 'tu_clave_secreta_aqui'
 socketio = SocketIO(app)
 
 # --- CONFIGURACIÓN DE RED Y ROLES ---
-# *** DEBES CAMBIAR ESTA IP *** con la IP estática real de tu MacBook asignada por el TP-Link.
+# Nota: La IP ADMIN_IP debe coincidir exactamente con la IP estática fijada de tu MacBook.
 ADMIN_IP = '192.168.100.101'
 SERVER_HOST = '192.168.10.100' # IP Estática del Servidor
 SERVER_PORT = 8080
@@ -33,7 +33,6 @@ ESTADO_JUEGO = {
 @app.route('/')
 def index():
     """Ruta principal que diferencia entre Administrador y Jugador."""
-    # request.remote_addr obtiene la IP del cliente (será la IP local si la conexión entra por el TP-Link).
     cliente_ip = request.remote_addr
 
     # Lógica de Diferenciación: Solo la IP estática de la MacBook obtiene la vista de Admin.
@@ -52,17 +51,19 @@ def handle_join(data):
     session_id = request.sid
     nombre = data.get('nombre', 'Jugador Anónimo')
 
+    # CORRECCIÓN para asegurar que el jugador siempre sea inicializado antes de responder (Problema 3)
+    # Utilizamos el nombre del jugador para evitar reinicializar si ya está conectado
     if session_id not in ESTADO_JUEGO["puntuaciones"]:
         # Inicializa la puntuación para la nueva sesión
         ESTADO_JUEGO["puntuaciones"][session_id] = {"nombre": nombre, "puntuacion": 0, "respondido": False}
-        
+    
     join_room('jugadores') # Agrega al cliente a la sala de broadcast
     print(f"[CONEXION] Jugador {nombre} ({request.remote_addr}) unido.")
 
-    # Envía a TODOS el estado de puntuaciones actualizado
-    socketio.emit('actualizar_lista', ESTADO_JUEGO["puntuaciones"])
-
-    # *** SOLUCIÓN 2: NOTIFICAR AL JUGADOR SOBRE EL ESTADO ACTUAL ***
+    # 1. CORRECCIÓN (Problema 1): Notifica al admin para actualizar la lista de jugadores.
+    socketio.emit('admin_estado', ESTADO_JUEGO, room=ADMIN_IP)
+    
+    # Notificar al jugador sobre el estado actual
     if ESTADO_JUEGO["activo"]:
         if ESTADO_JUEGO["ronda_actual"] != -1 and ESTADO_JUEGO["ronda_actual"] < len(PREGUNTAS):
             # Si hay una pregunta activa, se la enviamos inmediatamente.
@@ -76,6 +77,8 @@ def handle_join(data):
         # El juego está inactivo.
         emit('mensaje', '¡Bienvenido! El juego está INACTIVO. Esperando que el Administrador inicie.', room=session_id)
 
+    # Nota: La emisión 'actualizar_lista' fue eliminada ya que 'admin_estado' es más completo.
+
 @socketio.on('enviar_respuesta')
 def handle_respuesta(data):
     """Procesa la respuesta enviada por un jugador."""
@@ -86,9 +89,11 @@ def handle_respuesta(data):
         emit('mensaje', 'El juego no está activo o esperando una pregunta.')
         return
 
+    # Se mantiene la corrección del problema anterior (KeyError)
     if session_id not in ESTADO_JUEGO["puntuaciones"]:
-        emit('mensaje', 'Error: Debes unirte al juego primero (recargar página y unirte).')
+        emit('mensaje', 'Error de conexión. Por favor, recarga y únete de nuevo.')
         return
+    
     # Verificar si ya respondió en esta ronda
     if ESTADO_JUEGO["puntuaciones"][session_id]["respondido"]:
         emit('mensaje', 'Ya has respondido en esta ronda.')
@@ -104,9 +109,10 @@ def handle_respuesta(data):
     else:
         emit('mensaje', 'Respuesta incorrecta.', room=session_id)
 
-    # Notificar a todos sobre la actualización de puntuaciones
-    socketio.emit('actualizar_puntuacion', ESTADO_JUEGO["puntuaciones"])
-    socketio.emit('admin_estado', ESTADO_JUEGO, room='jugadores')
+    # 2. CORRECCIÓN (Problema 2): Actualización de puntuación en tiempo real para el admin
+    socketio.emit('admin_estado', ESTADO_JUEGO) # Emitimos a todos (incluido el admin)
+    
+    # Eliminamos la línea duplicada: socketio.emit('actualizar_puntuacion', ESTADO_JUEGO["puntuaciones"])
 
 
 @socketio.on('comando_admin')
@@ -122,7 +128,12 @@ def handle_comando_admin(data):
     if comando == 'iniciar':
         ESTADO_JUEGO["activo"] = True
         ESTADO_JUEGO["ronda_actual"] = -1
-        ESTADO_JUEGO["puntuaciones"] = {} # Reiniciar puntuaciones
+        # 3. CORRECCIÓN (Problema 3): Se eliminan las puntuaciones, pero los jugadores permanecen en el ESTADO_JUEGO
+        # Reiniciar puntuaciones para todos los jugadores existentes:
+        for session_id in list(ESTADO_JUEGO["puntuaciones"].keys()):
+            ESTADO_JUEGO["puntuaciones"][session_id]["puntuacion"] = 0
+            ESTADO_JUEGO["puntuaciones"][session_id]["respondido"] = False
+
         socketio.emit('mensaje_broadcast', '¡El juego ha iniciado! Administrador cargando la primera pregunta...', room='jugadores')
 
     elif comando == 'siguiente':
@@ -140,7 +151,8 @@ def handle_comando_admin(data):
             print(f"[ADMIN] Pregunta {ESTADO_JUEGO['ronda_actual'] + 1} enviada.")
         else:
             socketio.emit('mensaje_broadcast', 'No hay más preguntas. Finalizando juego...', room='jugadores')
-            comando_admin({'comando': 'finalizar'})
+            # Llamamos al finalizador directamente con el diccionario de datos.
+            handle_comando_admin({'comando': 'finalizar'})
 
     elif comando == 'finalizar':
         ESTADO_JUEGO["activo"] = False
@@ -155,5 +167,4 @@ if __name__ == '__main__':
     print(f"[*] Servidor corriendo en http://{SERVER_HOST}:{SERVER_PORT}")
     print(f"[*] IP de Administrador esperada: {ADMIN_IP}")
     # Enlaza el servidor a la IP estática local, esencial para el ruteo.
-    # socketio.run(app, port=SERVER_PORT, allow_unsafe_werkzeug=True)
     socketio.run(app, host=SERVER_HOST, port=SERVER_PORT, allow_unsafe_werkzeug=True)
