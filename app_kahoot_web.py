@@ -9,9 +9,9 @@ socketio = SocketIO(app)
 
 # --- CONFIGURACIÓN DE RED Y ROLES ---
 # *** DEBES CAMBIAR ESTA IP *** con la IP estática real de tu MacBook asignada por el TP-Link.
-ADMIN_IP = '192.168.1.101'
-SERVER_HOST = '192.168.1.100' # IP Estática del Servidor
-SERVER_PORT = 5001
+ADMIN_IP = '192.168.100.101'
+SERVER_HOST = '192.168.10.100' # IP Estática del Servidor
+SERVER_PORT = 8080
 
 # --- BASE DE DATOS DEL JUEGO ---
 PREGUNTAS = [
