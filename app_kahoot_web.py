@@ -15,9 +15,9 @@ SERVER_PORT = 8080
 
 # --- BASE DE DATOS DEL JUEGO ---
 PREGUNTAS = [
-    {"id": 1, "texto": "¿Cuál es el protocolo de la Capa de Transporte que garantiza la entrega de paquetes?", "opciones": ["A) UDP", "B) TCP", "C) ICMP"], "correcta": "B"},
-    {"id": 2, "texto": "¿Qué utilidad de red se usa para probar la conectividad (ICMP)?", "opciones": ["A) Telnet", "B) SSH", "C) Ping"], "correcta": "C"},
-    {"id": 3, "texto": "¿Qué tecnología evita el Port Forwarding tradicional y nos obligó a usar DMZ/ngrok?", "opciones": ["A) IPv6", "B) CG NAT", "C) VLAN"], "correcta": "B"},
+    {"id": 1, "texto": "¿Cuál es el protocolo de la Capa de Transporte que garantiza la entrega de paquetes?", "opciones": ["UDP", "TCP", "ICMP"], "correcta": "B"},
+    {"id": 2, "texto": "¿Qué utilidad de red se usa para probar la conectividad (ICMP)?", "opciones": ["Telnet", "SSH", "Ping"], "correcta": "C"},
+    {"id": 3, "texto": "¿Qué tecnología evita el Port Forwarding tradicional y nos obligó a usar DMZ/ngrok?", "opciones": ["IPv6", "CG NAT", "VLAN"], "correcta": "B"},
 ]
 
 # --- ESTADO GLOBAL DEL JUEGO ---
@@ -58,10 +58,23 @@ def handle_join(data):
         
     join_room('jugadores') # Agrega al cliente a la sala de broadcast
     print(f"[CONEXION] Jugador {nombre} ({request.remote_addr}) unido.")
-    
+
     # Envía a TODOS el estado de puntuaciones actualizado
     socketio.emit('actualizar_lista', ESTADO_JUEGO["puntuaciones"])
 
+    # *** SOLUCIÓN 2: NOTIFICAR AL JUGADOR SOBRE EL ESTADO ACTUAL ***
+    if ESTADO_JUEGO["activo"]:
+        if ESTADO_JUEGO["ronda_actual"] != -1 and ESTADO_JUEGO["ronda_actual"] < len(PREGUNTAS):
+            # Si hay una pregunta activa, se la enviamos inmediatamente.
+            pregunta_data = PREGUNTAS[ESTADO_JUEGO["ronda_actual"]]
+            emit('nueva_pregunta', pregunta_data, room=session_id)
+            emit('mensaje', '¡Bienvenido! Ya hay una pregunta activa.', room=session_id)
+        else:
+            # Si el juego está activo pero esperando una nueva pregunta.
+            emit('mensaje', '¡Bienvenido! El juego está activo. Esperando la siguiente pregunta.', room=session_id)
+    else:
+        # El juego está inactivo.
+        emit('mensaje', '¡Bienvenido! El juego está INACTIVO. Esperando que el Administrador inicie.', room=session_id)
 
 @socketio.on('enviar_respuesta')
 def handle_respuesta(data):
@@ -93,6 +106,7 @@ def handle_respuesta(data):
 
     # Notificar a todos sobre la actualización de puntuaciones
     socketio.emit('actualizar_puntuacion', ESTADO_JUEGO["puntuaciones"])
+    socketio.emit('admin_estado', ESTADO_JUEGO, room='jugadores')
 
 
 @socketio.on('comando_admin')
