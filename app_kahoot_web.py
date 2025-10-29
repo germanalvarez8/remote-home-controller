@@ -72,7 +72,10 @@ def handle_respuesta(data):
     if not ESTADO_JUEGO["activo"] or ESTADO_JUEGO["ronda_actual"] == -1:
         emit('mensaje', 'El juego no está activo o esperando una pregunta.')
         return
-        
+
+    if session_id not in ESTADO_JUEGO["puntuaciones"]:
+        emit('mensaje', 'Error: Debes unirte al juego primero (recargar página y unirte).')
+        return
     # Verificar si ya respondió en esta ronda
     if ESTADO_JUEGO["puntuaciones"][session_id]["respondido"]:
         emit('mensaje', 'Ya has respondido en esta ronda.')
@@ -138,5 +141,5 @@ if __name__ == '__main__':
     print(f"[*] Servidor corriendo en http://{SERVER_HOST}:{SERVER_PORT}")
     print(f"[*] IP de Administrador esperada: {ADMIN_IP}")
     # Enlaza el servidor a la IP estática local, esencial para el ruteo.
-    socketio.run(app, port=SERVER_PORT, allow_unsafe_werkzeug=True)
-    # socketio.run(app, host=SERVER_HOST, port=SERVER_PORT, allow_unsafe_werkzeug=True)
+    # socketio.run(app, port=SERVER_PORT, allow_unsafe_werkzeug=True)
+    socketio.run(app, host=SERVER_HOST, port=SERVER_PORT, allow_unsafe_werkzeug=True)
