@@ -25,6 +25,7 @@
 
     <script>
         const socket = io(); 
+        const REDIRECTION_DELAY = 100; // 100 milisegundos de espera para que el socket se establezca
 
         socket.on('connect', () => {
             console.log('Conectado al servidor.');
@@ -32,6 +33,7 @@
         
         // Maneja la orden de redirigir (solo si el nombre es 'Admin')
         socket.on('redirigir', (url) => {
+            // La redirección del Admin es inmediata porque el servidor lo confirma.
             window.location.href = url;
         });
 
@@ -42,17 +44,31 @@
 
         function unirseAlJuego() {
             const nombre = document.getElementById('nombre-input').value.trim();
-            if (nombre) {
-                // Envía el nombre al servidor para validación
-                socket.emit('conectar_jugador', {nombre: nombre});
-                
-                // Si el nombre no es "Admin", lo enviamos a la vista regular de jugador
-                if (nombre.toUpperCase() !== "ADMIN") {
-                    // Guarda el nombre en el almacenamiento local para usarlo en jugador.html
-                    localStorage.setItem('kahoot_nombre', nombre);
-                    window.location.href = '/jugador'; // Redirige a la vista de jugador
-                }
+            const esAdmin = nombre.toUpperCase() === "ADMIN";
+            const mensajeError = document.getElementById('mensaje-error');
+            mensajeError.textContent = '';
+            
+            if (!nombre) {
+                mensajeError.textContent = '¡Ingresa un nombre para continuar!';
+                return;
             }
+
+            // 1. Envía el nombre al servidor para validación
+            socket.emit('conectar_jugador', {nombre: nombre});
+            
+            // 2. Si es un JUGADOR regular, espera un momento antes de redirigir.
+            // Esto evita la "race condition" (condición de carrera) que cierra el socket.
+            if (!esAdmin) {
+                // Guarda el nombre en el almacenamiento local
+                localStorage.setItem('kahoot_nombre', nombre);
+                
+                // CORRECCIÓN: Usamos un timeout para asegurar que el servidor registre el socket.
+                setTimeout(() => {
+                    window.location.href = '/jugador'; 
+                }, REDIRECTION_DELAY);
+            }
+            
+            // Nota: Si es Admin, el servidor emitirá 'redirigir' por SocketIO.
         }
     </script>
 </body>
