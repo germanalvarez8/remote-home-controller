@@ -146,11 +146,6 @@ def handle_respuesta(data):
 def handle_comando_admin(data):
     global ADMIN_SESSION_ID
     """Procesa comandos solo si provienen de la IP del Administrador."""
-    # Control de Acceso por IP: La IP de origen DEBE ser la del Admin.
-    if request.remote_addr != ADMIN_IP:
-        print(f"[SEGURIDAD] Intento de comando Admin desde IP no autorizada: {request.remote_addr}")
-        return
-
     if request.sid != ADMIN_SESSION_ID:
         print(f"[SEGURIDAD] Comando no autorizado desde SID: {request.sid}")
         return
