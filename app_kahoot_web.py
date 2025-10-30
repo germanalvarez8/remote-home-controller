@@ -63,7 +63,7 @@ def handle_join(data):
             print(f"[ADMIN] Admin conectado desde {request.remote_addr}")
             
             # Notificamos al cliente que debe redirigir su navegador a la vista de admin.
-            emit('redirigir', url_for('admin_view'), room=session_id)
+            # emit('redirigir', url_for('admin_view'), room=session_id)
             return
         else:
             # 2. Rechaza el acceso: Ya hay un administrador activo.

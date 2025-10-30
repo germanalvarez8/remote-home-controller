@@ -26,7 +26,7 @@
 
         <hr>
         <h2>Estado Actual</h2>
-        <p id="status-display">Esperando comando de inicio...</p>
+        <p id="status-display">Conectando...</p>
 
         <h2>Puntuaciones</h2>
         <ul id="score-list">
@@ -41,7 +41,11 @@
         socket.on('connect', () => {
             console.log('Conectado al servidor como Administrador.');
             document.getElementById('status-display').textContent = 'Conectado. Presiona INICIAR JUEGO.';
-            socket.emit('comando_admin', {comando: 'estado'}); // Pedir estado inicial
+            
+            // CORRECCIÓN: Usamos un delay para asegurar que el socket esté totalmente listo antes de enviar comandos.
+            setTimeout(() => {
+                socket.emit('comando_admin', {comando: 'estado'}); // Pedir estado inicial y de jugadores
+            }, 100); 
         });
 
         // Manejar el estado enviado por el servidor
@@ -54,7 +58,8 @@
             document.getElementById('end-btn').disabled = !juego_activo;
             
             if (juego_activo) {
-                document.getElementById('status-display').textContent = `Juego ACTIVO. Ronda: ${estado.ronda_actual + 1}`;
+                const ronda = estado.ronda_actual === -1 ? 0 : estado.ronda_actual + 1;
+                document.getElementById('status-display').textContent = `Juego ACTIVO. Ronda: ${ronda}`;
             } else {
                 document.getElementById('status-display').textContent = 'Juego INACTIVO. Listo para iniciar.';
             }
@@ -66,11 +71,20 @@
             // Convertir el objeto de puntuaciones a un array para ordenarlo
             const scoresArray = Object.values(estado.puntuaciones).sort((a, b) => b.puntuacion - a.puntuacion);
             
-            scoresArray.forEach(info => {
-                const li = document.createElement('li');
-                li.textContent = `${info.nombre}: ${info.puntuacion} puntos`;
-                scoreList.appendChild(li);
-            });
+            if (scoresArray.length === 0) {
+                 scoreList.innerHTML = '<li>Aún no hay jugadores conectados.</li>';
+            } else {
+                scoresArray.forEach((info, index) => {
+                    const li = document.createElement('li');
+                    // Mostrar quién ya ha respondido si el juego está en curso
+                    let respuestaEstado = '';
+                    if (juego_activo && estado.ronda_actual !== -1) {
+                         respuestaEstado = info.respondido ? ' ✅' : ' ❌';
+                    }
+                    li.textContent = `#${index + 1}: ${info.nombre}: ${info.puntuacion} puntos${respuestaEstado}`;
+                    scoreList.appendChild(li);
+                });
+            }
         });
 
         // Configuración de botones
