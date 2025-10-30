@@ -10,8 +10,8 @@ socketio = SocketIO(app)
 # --- CONFIGURACIÓN DE RED Y ROLES ---
 # Nota: La IP ADMIN_IP debe coincidir exactamente con la IP estática fijada de tu MacBook.
 ADMIN_IP = '192.168.100.101'
-SERVER_HOST = '192.168.10.100' # IP Estática del Servidor
-SERVER_PORT = 8080
+SERVER_HOST = 'localhost' # IP Estática del Servidor
+SERVER_PORT = 5001
 ADMIN_SESSION_ID = None
 
 # --- BASE DE DATOS DEL JUEGO ---
@@ -54,6 +54,10 @@ def handle_join(data):
     global ADMIN_SESSION_ID
     session_id = request.sid
     nombre_ingresado = data.get('nombre', 'Jugador Anónimo').strip()
+
+    # Emitir actualización de puntuaciones a todos los jugadores
+    def broadcast_scores():
+        socketio.emit('actualizar_puntuacion', ESTADO_JUEGO["puntuaciones"], room='jugadores')
     
     # --- LÓGICA DE CONTROL DE ACCESO ADMIN ---
     if nombre_ingresado.upper() == "ADMIN":
@@ -100,6 +104,9 @@ def handle_join(data):
             emit('mensaje', '¡Bienvenido! El juego está activo. Esperando la siguiente pregunta.', room=session_id)
     else:
         emit('mensaje', '¡Bienvenido! El juego está INACTIVO. Esperando que el Administrador inicie.', room=session_id)
+    
+    # Enviar puntuaciones actualizadas a todos los jugadores
+    broadcast_scores()
 
 @socketio.on('enviar_respuesta')
 def handle_respuesta(data):
@@ -131,8 +138,9 @@ def handle_respuesta(data):
     else:
         emit('mensaje', 'Respuesta incorrecta.', room=session_id)
 
-    # 2. CORRECCIÓN (Problema 2): Actualización de puntuación en tiempo real para el admin
-    socketio.emit('admin_estado', ESTADO_JUEGO) # Emitimos a todos (incluido el admin)
+    # Actualizamos el estado para el admin y las puntuaciones para todos los jugadores
+    socketio.emit('admin_estado', ESTADO_JUEGO)  # Para el admin
+    socketio.emit('actualizar_puntuacion', ESTADO_JUEGO["puntuaciones"], room='jugadores')  # Para todos los jugadores
     
     # Eliminamos la línea duplicada: socketio.emit('actualizar_puntuacion', ESTADO_JUEGO["puntuaciones"])
 
