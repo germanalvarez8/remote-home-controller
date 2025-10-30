@@ -70,27 +70,25 @@ def handle_join(data):
             emit('mensaje_error_login', 'ERROR: Ya hay un Administrador activo. Solo se permite uno.')
             return
 
-    # --- Lógica de Jugador Estándar (Si no es 'Admin' o si el 'Admin' ya está ocupado) ---
+    # --- Lógica de Jugador Estándar ---
     
-    # 3. Inicializa el jugador (asegurando un nombre único si es necesario, aunque aquí lo simplificamos)
     nombre = nombre_ingresado
     
+    # 1. Inicialización Única: Aseguramos que el jugador se inicialice una sola vez.
     if session_id not in ESTADO_JUEGO["puntuaciones"]:
         ESTADO_JUEGO["puntuaciones"][session_id] = {"nombre": nombre, "puntuacion": 0, "respondido": False}
         
-    join_room('jugadores') 
-    print(f"[CONEXION] Jugador {nombre} ({request.remote_addr}) unido.")
-    if session_id not in ESTADO_JUEGO["puntuaciones"]:
-        # Inicializa la puntuación para la nueva sesión
-        ESTADO_JUEGO["puntuaciones"][session_id] = {"nombre": nombre, "puntuacion": 0, "respondido": False}
-    
-    join_room('jugadores') # Agrega al cliente a la sala de broadcast
+    join_room('jugadores') # Única llamada para unirse a la sala de broadcast
     print(f"[CONEXION] Jugador {nombre} ({request.remote_addr}) unido.")
 
     # 1. CORRECCIÓN (Problema 1): Notifica al admin para actualizar la lista de jugadores.
-    socketio.emit('admin_estado', ESTADO_JUEGO, room=ADMIN_IP)
+    # Usamos try/except porque el admin puede no estar conectado.
+    try:
+        socketio.emit('admin_estado', ESTADO_JUEGO, room=ADMIN_SESSION_ID)
+    except:
+        pass
     
-    # Notificar al jugador sobre el estado actual
+    # Notificar al jugador sobre el estado actual (lógica de reingreso)
     if ESTADO_JUEGO["activo"]:
         if ESTADO_JUEGO["ronda_actual"] != -1 and ESTADO_JUEGO["ronda_actual"] < len(PREGUNTAS):
             # Si hay una pregunta activa, se la enviamos inmediatamente.
@@ -103,8 +101,6 @@ def handle_join(data):
     else:
         # El juego está inactivo.
         emit('mensaje', '¡Bienvenido! El juego está INACTIVO. Esperando que el Administrador inicie.', room=session_id)
-
-    # Nota: La emisión 'actualizar_lista' fue eliminada ya que 'admin_estado' es más completo.
 
 @socketio.on('enviar_respuesta')
 def handle_respuesta(data):
