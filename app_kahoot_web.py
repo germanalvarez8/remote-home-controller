@@ -10,8 +10,8 @@ socketio = SocketIO(app)
 # --- CONFIGURACIÓN DE RED Y ROLES ---
 # Nota: La IP ADMIN_IP debe coincidir exactamente con la IP estática fijada de tu MacBook.
 ADMIN_IP = '192.168.100.101'
-SERVER_HOST = 'localhost' # IP Estática del Servidor
-SERVER_PORT = 5001
+SERVER_HOST = '192.168.10.100' # IP Estática del Servidor
+SERVER_PORT = 8080
 ADMIN_SESSION_ID = None
 
 # --- BASE DE DATOS DEL JUEGO ---
@@ -211,6 +211,4 @@ def handle_disconnect():
 
 if __name__ == '__main__':
     print(f"[*] Servidor corriendo en http://{SERVER_HOST}:{SERVER_PORT}")
-    print(f"[*] IP de Administrador esperada: {ADMIN_IP}")
-    # Enlaza el servidor a la IP estática local, esencial para el ruteo.
     socketio.run(app, host=SERVER_HOST, port=SERVER_PORT, allow_unsafe_werkzeug=True)
