@@ -50,7 +50,7 @@ def jugador_view():
 # --- GESTIÓN DE SOCKETS (Comunicación en Tiempo Real) ---
 @socketio.on('conectar_jugador')
 def handle_join(data):
-    """Maneja la unión de un nuevo jugador, incluyendo la validación de 'Admin'."""
+    """Maneja la unión de un nuevo jugador, enviando una bandera de éxito/error al cliente."""
     global ADMIN_SESSION_ID
     session_id = request.sid
     nombre_ingresado = data.get('nombre', 'Jugador Anónimo').strip()
@@ -58,16 +58,16 @@ def handle_join(data):
     # --- LÓGICA DE CONTROL DE ACCESO ADMIN ---
     if nombre_ingresado.upper() == "ADMIN":
         if ADMIN_SESSION_ID is None:
-            # 1. Permite el acceso: La sesión es declarada como Administrador.
+            # 1. Permite el acceso: Envía la bandera de Éxito y establece la sesión.
             ADMIN_SESSION_ID = session_id
             print(f"[ADMIN] Admin conectado desde {request.remote_addr}")
             
-            # Notificamos al cliente que debe redirigir su navegador a la vista de admin.
-            # emit('redirigir', url_for('admin_view'), room=session_id)
+            # **NUEVO:** Envía una bandera de éxito en lugar de la redirección.
+            emit('login_success', {'role': 'admin'}, room=session_id)
             return
         else:
-            # 2. Rechaza el acceso: Ya hay un administrador activo.
-            emit('mensaje_error_login', 'ERROR: Ya hay un Administrador activo. Solo se permite uno.')
+            # 2. Rechaza el acceso: Envía un mensaje de error de login.
+            emit('login_error', 'ERROR: Ya hay un Administrador activo. Solo se permite uno.')
             return
 
     # --- Lógica de Jugador Estándar ---
@@ -78,11 +78,13 @@ def handle_join(data):
     if session_id not in ESTADO_JUEGO["puntuaciones"]:
         ESTADO_JUEGO["puntuaciones"][session_id] = {"nombre": nombre, "puntuacion": 0, "respondido": False}
         
-    join_room('jugadores') # Única llamada para unirse a la sala de broadcast
+    join_room('jugadores') 
     print(f"[CONEXION] Jugador {nombre} ({request.remote_addr}) unido.")
 
+    # 2. Envía la bandera de Jugador Exitoso (No hay redirección)
+    emit('login_success', {'role': 'jugador', 'nombre': nombre}, room=session_id)
+
     # 1. CORRECCIÓN (Problema 1): Notifica al admin para actualizar la lista de jugadores.
-    # Usamos try/except porque el admin puede no estar conectado.
     try:
         socketio.emit('admin_estado', ESTADO_JUEGO, room=ADMIN_SESSION_ID)
     except:
@@ -91,15 +93,12 @@ def handle_join(data):
     # Notificar al jugador sobre el estado actual (lógica de reingreso)
     if ESTADO_JUEGO["activo"]:
         if ESTADO_JUEGO["ronda_actual"] != -1 and ESTADO_JUEGO["ronda_actual"] < len(PREGUNTAS):
-            # Si hay una pregunta activa, se la enviamos inmediatamente.
             pregunta_data = PREGUNTAS[ESTADO_JUEGO["ronda_actual"]]
             emit('nueva_pregunta', pregunta_data, room=session_id)
             emit('mensaje', '¡Bienvenido! Ya hay una pregunta activa.', room=session_id)
         else:
-            # Si el juego está activo pero esperando una nueva pregunta.
             emit('mensaje', '¡Bienvenido! El juego está activo. Esperando la siguiente pregunta.', room=session_id)
     else:
-        # El juego está inactivo.
         emit('mensaje', '¡Bienvenido! El juego está INACTIVO. Esperando que el Administrador inicie.', room=session_id)
 
 @socketio.on('enviar_respuesta')

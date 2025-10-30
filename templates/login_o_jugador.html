@@ -2,49 +2,93 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Kahoot - Únete</title>
+    <title>Kahoot - Acceso</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; text-align: center; background-color: #f4f4f4; }
-        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
         .form-box { padding: 20px; }
-        button { background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; border: none; border-radius: 5px; color: white; }
+
+        /* Estilos de Admin */
+        #admin-view-container button { background-color: #2196F3; }
+        #start-btn { background-color: #4CAF50; }
+        #end-btn { background-color: #f44336; }
+
+        /* Estilos de Jugador */
+        #jugador-view-container .opcion-btn { padding: 15px 30px; margin: 10px; font-size: 1.2em; border: none; border-radius: 8px; color: white; width: 100%; transition: background-color 0.3s; }
+        #A-btn { background-color: #4CAF50; }
+        #B-btn { background-color: #2196F3; }
+        #C-btn { background-color: #FF9800; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Kahoot de Redes</h1>
         
-        <div class="form-box">
+        <div id="login-form-container" class="form-box">
             <h2>Ingresa tu Nombre</h2>
             <input type="text" id="nombre-input" placeholder="Nombre (o 'Admin')" required style="padding: 10px; width: 80%; margin-bottom: 15px;">
             <button onclick="unirseAlJuego()">Unirse al Juego</button>
             <p id="mensaje-error" style="color: red; margin-top: 15px;"></p>
         </div>
+
+        <div id="admin-view-container" style="display:none;">
+            <h2>🎮 Kahoot Admin (IP: <span id="admin-ip-display"></span>)</h2>
+            <p>Control de juego centralizado.</p>
+            
+            <div id="controls">
+                <button id="start-btn">INICIAR JUEGO</button>
+                <button id="next-btn" disabled>SIGUIENTE PREGUNTA</button>
+                <button id="end-btn" disabled>FINALIZAR JUEGO</button>
+            </div>
+
+            <hr>
+            <h3>Estado Actual</h3>
+            <p id="status-display">Esperando comando de inicio...</p>
+
+            <h3>Puntuaciones</h3>
+            <ul id="score-list"></ul>
+        </div>
+
+        <div id="jugador-view-container" style="display:none;">
+            <p>Conectado como: <strong id="player-name"></strong></p>
+            <h2 id="game-title">Puntuación: 0</h2>
+            <div class="pregunta-box">
+                <h3 id="pregunta-texto">Esperando que el Administrador inicie el juego...</h3>
+                <div id="opciones-area"></div>
+            </div>
+            <p id="mensaje-servidor" style="color: red; margin-top: 15px;">Mensajes del Servidor.</p>
+        </div>
     </div>
 
     <script>
         const socket = io(); 
-        const REDIRECTION_DELAY = 100; // 100 milisegundos de espera para que el socket se establezca
+        let juego_activo = false;
+        let nombreJugador = '';
 
-        socket.on('connect', () => {
-            console.log('Conectado al servidor.');
-        });
-        
-        // Maneja la orden de redirigir (solo si el nombre es 'Admin')
-        socket.on('redirigir', (url) => {
-            // La redirección del Admin es inmediata porque el servidor lo confirma.
-            window.location.href = url;
-        });
+        // --- FUNCIONES DE VISTA ---
+        function mostrarVista(role, data = {}) {
+            document.getElementById('login-form-container').style.display = 'none';
+            document.getElementById('admin-view-container').style.display = 'none';
+            document.getElementById('jugador-view-container').style.display = 'none';
 
-        // Maneja el error si ya hay un Admin activo
-        socket.on('mensaje_error_login', (msg) => {
-            document.getElementById('mensaje-error').textContent = msg;
-        });
+            if (role === 'admin') {
+                document.getElementById('admin-view-container').style.display = 'block';
+                document.getElementById('admin-ip-display').textContent = 'Acceso Remoto'; // Muestra que estás como admin
+                // Dispara el comando inicial para cargar el estado
+                setTimeout(() => {
+                    socket.emit('comando_admin', {comando: 'estado'}); 
+                }, 100); 
+            } else {
+                nombreJugador = data.nombre;
+                document.getElementById('jugador-view-container').style.display = 'block';
+                document.getElementById('player-name').textContent = nombreJugador;
+            }
+        }
 
         function unirseAlJuego() {
             const nombre = document.getElementById('nombre-input').value.trim();
-            const esAdmin = nombre.toUpperCase() === "ADMIN";
             const mensajeError = document.getElementById('mensaje-error');
             mensajeError.textContent = '';
             
@@ -52,24 +96,117 @@
                 mensajeError.textContent = '¡Ingresa un nombre para continuar!';
                 return;
             }
-
-            // 1. Envía el nombre al servidor para validación
+            // Envía el nombre al servidor para validación
             socket.emit('conectar_jugador', {nombre: nombre});
-            
-            // 2. Si es un JUGADOR regular, espera un momento antes de redirigir.
-            // Esto evita la "race condition" (condición de carrera) que cierra el socket.
-            if (!esAdmin) {
-                // Guarda el nombre en el almacenamiento local
-                localStorage.setItem('kahoot_nombre', nombre);
-                
-                // CORRECCIÓN: Usamos un timeout para asegurar que el servidor registre el socket.
-                setTimeout(() => {
-                    window.location.href = '/jugador'; 
-                }, REDIRECTION_DELAY);
-            }
-            
-            // Nota: Si es Admin, el servidor emitirá 'redirigir' por SocketIO.
         }
+        
+        function enviarRespuesta(opcion) {
+            document.querySelectorAll('.opcion-btn').forEach(btn => btn.disabled = true);
+            socket.emit('enviar_respuesta', {respuesta: opcion});
+        }
+
+
+        // --- HANDLERS DE SOCKET.IO ---
+
+        socket.on('connect', () => {
+            console.log('Conectado al servidor.');
+        });
+        
+        // Maneja el éxito del login (Admin o Jugador)
+        socket.on('login_success', (data) => {
+            mostrarVista(data.role, data);
+        });
+
+        // Maneja el error si ya hay un Admin activo
+        socket.on('login_error', (msg) => {
+            document.getElementById('mensaje-error').textContent = msg;
+        });
+
+        // --- LÓGICA DE JUGADOR (Mismo código de jugador.html, pero ahora está aquí) ---
+
+        socket.on('mensaje', (msg) => {
+            document.getElementById('mensaje-servidor').textContent = msg;
+            document.querySelectorAll('.opcion-btn').forEach(btn => btn.disabled = false); // Habilitar botones tras un mensaje
+        });
+        
+        socket.on('mensaje_broadcast', (msg) => {
+            document.getElementById('mensaje-servidor').textContent = msg;
+        });
+
+        socket.on('nueva_pregunta', (data) => {
+            document.getElementById('pregunta-texto').textContent = data.texto;
+            const opcionesArea = document.getElementById('opciones-area');
+            opcionesArea.innerHTML = '';
+            
+            data.opciones.forEach((opcion, index) => {
+                const letra = ['A', 'B', 'C'][index];
+                const btn = document.createElement('button');
+                btn.id = `${letra}-btn`;
+                btn.className = 'opcion-btn';
+                btn.textContent = `${letra}) ${opcion}`;
+                btn.addEventListener('click', () => enviarRespuesta(letra));
+                opcionesArea.appendChild(btn);
+            });
+            
+            document.getElementById('mensaje-servidor').textContent = '¡Ronda iniciada! Selecciona tu respuesta.';
+        });
+        
+        socket.on('actualizar_puntuacion', (scores) => {
+            // Muestra la puntuación del jugador actual
+            const currentScore = Object.values(scores).find(info => info.nombre === nombreJugador);
+            if (currentScore) {
+                document.getElementById('game-title').textContent = `Puntuación: ${currentScore.puntuacion}`;
+            }
+        });
+
+
+        // --- LÓGICA DE ADMIN (Mismo código de admin.html) ---
+
+        socket.on('admin_estado', (estado) => {
+            // Lógica de actualización de botones y lista de jugadores (copiada de admin.html)
+            
+            // Actualizar botones y estado
+            document.getElementById('start-btn').disabled = estado.activo;
+            document.getElementById('next-btn').disabled = !estado.activo;
+            document.getElementById('end-btn').disabled = !estado.activo;
+            
+            if (estado.activo) {
+                const ronda = estado.ronda_actual === -1 ? 0 : estado.ronda_actual + 1;
+                document.getElementById('status-display').textContent = `Juego ACTIVO. Ronda: ${ronda}`;
+            } else {
+                document.getElementById('status-display').textContent = 'Juego INACTIVO. Listo para iniciar.';
+            }
+
+            // Actualizar lista de puntuaciones
+            const scoreList = document.getElementById('score-list');
+            scoreList.innerHTML = '';
+            const scoresArray = Object.values(estado.puntuaciones).sort((a, b) => b.puntuacion - a.puntuacion);
+            
+            if (scoresArray.length === 0) {
+                 scoreList.innerHTML = '<li>Aún no hay jugadores conectados.</li>';
+            } else {
+                scoresArray.forEach((info, index) => {
+                    const li = document.createElement('li');
+                    let respuestaEstado = '';
+                    if (estado.activo && estado.ronda_actual !== -1) {
+                         respuestaEstado = info.respondido ? ' ✅' : ' ❌';
+                    }
+                    li.textContent = `#${index + 1}: ${info.nombre}: ${info.puntuacion} puntos${respuestaEstado}`;
+                    scoreList.appendChild(li);
+                });
+            }
+        });
+
+        // Configuración de botones de Admin
+        document.getElementById('start-btn').addEventListener('click', () => {
+            socket.emit('comando_admin', {comando: 'iniciar'});
+        });
+        document.getElementById('next-btn').addEventListener('click', () => {
+            socket.emit('comando_admin', {comando: 'siguiente'});
+        });
+        document.getElementById('end-btn').addEventListener('click', () => {
+            socket.emit('comando_admin', {comando: 'finalizar'});
+        });
     </script>
 </body>
 </html>
